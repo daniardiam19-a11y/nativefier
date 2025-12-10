@@ -1,0 +1,164 @@
+ <!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Kamera Simulasi Live Photo</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; }
+        .container { margin-top: 30px; }
+        #videoElement {
+            width: 80%;
+            max-width: 600px;
+            height: auto;
+            border: 5px solid #007bff;
+            border-radius: 10px;
+            background-color: #000;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+        }
+        #captureButton {
+            background-color: #28a745;
+            color: white;
+        }
+        .results {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        .result-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            width: 45%;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>📸 Aplikasi Kamera dengan Fitur Simulasi Live</h1>
+
+    <div class="container">
+        <video id="videoElement" autoplay playsinline></video>
+
+        <br>
+        <button id="captureButton">Ambil Foto (Simpan Klip)</button>
+    </div>
+
+    <div class="results">
+        <div class="result-box">
+            <h3>Foto (Snapshot)</h3>
+            <img id="photoResult" style="width: 100%; height: auto;">
+        </div>
+        <div class="result-box">
+            <h3>Klip Video Live</h3>
+            <video id="videoResult" controls style="width: 100%; height: auto;"></video>
+        </div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('videoElement');
+        const captureButton = document.getElementById('captureButton');
+        const photoResult = document.getElementById('photoResult');
+        const videoResult = document.getElementById('videoResult');
+
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream;
+
+        // 1. Inisialisasi Kamera dan Perekaman
+        async function initCamera() {
+            try {
+                // Mendapatkan akses ke kamera dan mikrofon
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                videoElement.srcObject = stream;
+                
+                // Setelah stream dimuat, mulai perekam media
+                videoElement.onloadedmetadata = () => {
+                    videoElement.play();
+                    startRecording(); // Mulai merekam secara terus menerus di latar belakang
+                };
+
+            } catch (err) {
+                console.error("Gagal mengakses media:", err);
+                alert("Gagal mengakses kamera. Pastikan Anda mengizinkan akses dan menggunakan HTTPS/localhost.");
+            }
+        }
+
+        // 2. Fungsi untuk memulai Perekaman (Video Live Terus Menerus)
+        function startRecording() {
+            // Gunakan format video yang didukung, default ke 'video/webm'
+            const options = { mimeType: 'video/webm; codecs=vp9' }; 
+            
+            mediaRecorder = new MediaRecorder(stream, options);
+
+            // Ketika data video tersedia (berupa potongan/chunk)
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            
+            // Perekaman akan dihentikan dan klip akan diproses di sini
+            mediaRecorder.onstop = () => {
+                // Membuat objek Blob dari potongan-potongan video
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                // Membuat URL objek untuk ditampilkan
+                videoResult.src = URL.createObjectURL(blob);
+                recordedChunks = []; // Kosongkan array untuk klip berikutnya
+                
+                // Setelah selesai, langsung mulai merekam lagi (simulasi proses Live Photo)
+                startRecording();
+            };
+
+            // Mulai merekam. Potongan data akan dikumpulkan
+            mediaRecorder.start(100); // Kumpulkan data setiap 100 milidetik
+            console.log("Perekaman Live Photo Dimulai...");
+        }
+
+        // 3. Fungsi untuk Mengambil Foto dan Menyimpan Klip
+        function captureMedia() {
+            // A. Ambil Foto (Snapshot)
+            const canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            const context = canvas.getContext('2d');
+            
+            // Gambar frame video saat ini ke kanvas
+            context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+            
+            // Konversi kanvas menjadi gambar Data URL
+            const photoDataUrl = canvas.toDataURL('image/png');
+            photoResult.src = photoDataUrl;
+            
+            // B. Simpan Klip Video
+            // Hentikan perekam saat ini (ini akan memicu mediaRecorder.onstop untuk menyimpan klip)
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+            
+            alert("Foto dan Klip Video Berhasil Diambil!");
+        }
+
+        // Event Listener untuk Tombol Ambil Foto
+        captureButton.addEventListener('click', captureMedia);
+
+        // Mulai aplikasi kamera saat halaman dimuat
+        initCamera();
+
+        // JANGAN LUPA: Hentikan stream saat aplikasi ditutup (Opsional, tapi baik)
+        window.onbeforeunload = () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+
+    </script>
+</body>
+</html>
